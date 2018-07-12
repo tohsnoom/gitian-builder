@@ -40,6 +40,16 @@ Vagrant.configure("2") do |config|
       config.vm.box = box
       config.vm.provider :virtualbox do |vb|
         vb.name = "Gitian-#{name}"
+        vmdk_path = get_vagrant_box_path()
+        tmp1 = vmdk_path."tmp1"
+        tmp2 = vmdk_path."tmp2"
+
+        v.customize "pre-boot", ["clonehd",  vmdk_path,  tmp1, "--format vdi"]
+        v.customize "pre-boot", ["modifyhd", tmp1, "--resize", "32678"]
+        v.customize "pre-boot", ["clonehd",  tmp1,       tmp2, "--format vmdk"]
+
+        rm vmdk_path tmp1
+        mv tmp2 vmdk_path
       end
     end
   end
@@ -53,6 +63,16 @@ Vagrant.configure("2") do |config|
         config.vm.box_url = "https://cloud-images.ubuntu.com/#{suite}/current/#{suite}-server-cloudimg-#{arch}-vagrant.box"
         config.vm.provider :virtualbox do |vb|
           vb.name = "Gitian-#{name}"
+          vmdk_path = get_vagrant_box_path()
+          tmp1 = vmdk_path."tmp1"
+          tmp2 = vmdk_path."tmp2"
+
+          v.customize "pre-boot", ["clonehd",  vmdk_path,  tmp1, "--format vdi"]
+          v.customize "pre-boot", ["modifyhd", tmp1, "--resize", "32678"]
+          v.customize "pre-boot", ["clonehd",  tmp1,       tmp2, "--format vmdk"]
+
+          rm vmdk_path tmp1
+          mv tmp2 vmdk_path
         end
       end
     end

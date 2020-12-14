@@ -13,3 +13,6 @@ target-bin/bootstrap-fixup
 .vagrant
 docker
 *.Dockerfile
+cache
+target-*
+!target-bin/

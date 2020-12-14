@@ -4,7 +4,7 @@ set -e
 DISTRO=ubuntu
 SUITE=xenial
 ARCH=amd64
-MIRROR_BASE=http://${MIRROR_HOST:-127.0.0.1}:3142
+DISKSIZE=12287
 LXC=0
 VBOX=0
 DOCKER=0
@@ -19,6 +19,7 @@ usage() {
   --distro D                build distro D (e.g. debian) instead of ubuntu
   --suite U                 build suite U instead of xenial
   --arch A                  build architecture A (e.g. i386) instead of amd64
+  --disksize S              disk/image size S in MB (default 12287)
   --lxc                     use lxc instead of kvm
   --vbox                    use VirtualBox instead of kvm
   --docker                  use docker instead of kvm
@@ -71,6 +72,10 @@ if [ $# != 0 ] ; then
         ARCH="$2"
         shift 2
         ;;
+      --disksize)
+        DISKSIZE="$2"
+        shift 2
+        ;;
       --lxc)
         LXC=1
         shift 1
@@ -97,6 +102,13 @@ if [ $# != 0 ] ; then
     esac
   done
 fi
+
+if [ $DOCKER = "1" ]; then
+  MIRROR_DEFAULT=172.17.0.1
+else
+  MIRROR_DEFAULT=127.0.0.1
+fi
+MIRROR_BASE=http://${MIRROR_HOST:-$MIRROR_DEFAULT}:3142
 
 if [ $DISTRO = "ubuntu" ]; then
   MIRROR=$MIRROR_BASE/archive.ubuntu.com/ubuntu
@@ -189,6 +201,7 @@ if [ $DOCKER = "1" ]; then
 FROM $base_image
 
 ENV DEBIAN_FRONTEND=noninteractive
+RUN echo 'Acquire::http { Proxy "$MIRROR_BASE"; };' > /etc/apt/apt.conf.d/50cacher
 RUN apt-get update && apt-get --no-install-recommends -y install $addpkg
 
 RUN useradd -ms /bin/bash -U $DISTRO
@@ -264,7 +277,7 @@ if [ $LXC = "1" ]; then
       fi
     fi
   fi
-  dd if=/dev/zero of=$OUT-lxc bs=1M count=1 seek=10240
+  dd if=/dev/zero of=$OUT-lxc bs=1M count=1 seek=$DISKSIZE
   /sbin/mkfs.ext4 -F $OUT-lxc
   t=`mktemp -d gitian.XXXXXXXX`
   sudo mount $OUT-lxc $t
@@ -283,7 +296,7 @@ else
   libexec/config-bootstrap-fixup
 
   rm -rf $OUT
-  env -i LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 sudo vmbuilder kvm $DISTRO --rootsize 10240 --arch=$ARCH --suite=$SUITE --addpkg=$addpkg --removepkg=$removepkg --ssh-key=var/id_rsa.pub --ssh-user-key=var/id_rsa.pub --mirror=$MIRROR --security-mirror=$SECURITY_MIRROR --dest=$OUT --flavour=$FLAVOUR --firstboot=`pwd`/target-bin/bootstrap-fixup
+  env -i LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 sudo vmbuilder kvm $DISTRO --rootsize $DISKSIZE --arch=$ARCH --suite=$SUITE --addpkg=$addpkg --removepkg=$removepkg --ssh-key=var/id_rsa.pub --ssh-user-key=var/id_rsa.pub --mirror=$MIRROR --security-mirror=$SECURITY_MIRROR --dest=$OUT --flavour=$FLAVOUR --firstboot=`pwd`/target-bin/bootstrap-fixup
   mv $OUT/*.qcow2 $OUT.qcow2
   rm -rf $OUT
   # bootstrap-fixup is done on first boot
